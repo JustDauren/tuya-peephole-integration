@@ -74,20 +74,31 @@ class TuyaPeepholeConfigFlow(ConfigFlow, domain=DOMAIN):
                     password=user_input[CONF_PASSWORD],
                     country_code=region.upper(),
                 )
-                await self._api.async_login()
-                self._devices = await self._api.async_get_device_list()
-            except TuyaAuthError:
+                _LOGGER.debug("Attempting Tuya login for %s (region=%s)", user_input[CONF_EMAIL], region)
+                login_result = await self._api.async_login()
+                _LOGGER.debug("Login successful, uid=%s. Fetching device list...", self._api.uid)
+                try:
+                    self._devices = await self._api.async_get_device_list()
+                except TuyaApiError:
+                    _LOGGER.warning("Device list API failed, trying fallback endpoint")
+                    self._devices = await self._api.async_get_device_list_fallback()
+            except TuyaAuthError as err:
+                _LOGGER.warning("Auth failed: %s", err)
                 errors["base"] = "invalid_auth"
-            except TuyaApiError:
+            except TuyaApiError as err:
+                _LOGGER.error("API error during setup: %s", err)
                 errors["base"] = "cannot_connect"
             except Exception:
                 _LOGGER.exception("Unexpected error during setup")
                 errors["base"] = "unknown"
             else:
-                if not self._devices:
-                    errors["base"] = "no_devices"
-                else:
+                _LOGGER.debug("Found %d devices", len(self._devices))
+                if self._devices:
                     return await self.async_step_device()
+                else:
+                    # No devices found via API — fall through to manual entry
+                    _LOGGER.warning("No devices found via API, offering manual entry")
+                    return await self.async_step_manual()
 
         return self.async_show_form(
             step_id="user",
@@ -148,6 +159,43 @@ class TuyaPeepholeConfigFlow(ConfigFlow, domain=DOMAIN):
         return self.async_show_form(
             step_id="device",
             data_schema=device_schema,
+            errors=errors,
+        )
+
+    async def async_step_manual(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Fallback: manual device_id + local_key entry."""
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            device_id = user_input[CONF_DEVICE_ID]
+            local_key = user_input[CONF_LOCAL_KEY]
+
+            await self.async_set_unique_id(device_id)
+            self._abort_if_unique_id_configured()
+
+            return self.async_create_entry(
+                title=f"Tuya Peephole {device_id[:8]}...",
+                data={
+                    CONF_EMAIL: self._credentials[CONF_EMAIL],
+                    CONF_PASSWORD: self._credentials[CONF_PASSWORD],
+                    CONF_REGION: self._credentials[CONF_REGION],
+                    CONF_DEVICE_ID: device_id,
+                    CONF_LOCAL_KEY: local_key,
+                },
+            )
+
+        manual_schema = vol.Schema(
+            {
+                vol.Required(CONF_DEVICE_ID): str,
+                vol.Required(CONF_LOCAL_KEY): str,
+            }
+        )
+
+        return self.async_show_form(
+            step_id="manual",
+            data_schema=manual_schema,
             errors=errors,
         )
 

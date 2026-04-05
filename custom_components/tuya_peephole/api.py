@@ -182,8 +182,45 @@ class TuyaSmartAPI:
             "/api/discovery/pns/device/list",
             {"type": "all"},
         )
-        devices: list[dict[str, Any]] = resp.get("result", [])
+        result = resp.get("result", [])
+        # API may return list directly or nested in "list" key
+        if isinstance(result, dict):
+            devices = result.get("list", result.get("devices", []))
+        else:
+            devices = result
+        _LOGGER.debug("Device list: found %d devices", len(devices))
         return devices
+
+    async def async_get_device_list_fallback(self) -> list[dict[str, Any]]:
+        """Fallback: get devices via home list → device list per home."""
+        _LOGGER.debug("Trying fallback: /api/home/list → per-home device list")
+        homes_resp = await self._post("/api/home/list", {})
+        homes = homes_resp.get("result", [])
+        if isinstance(homes, dict):
+            homes = homes.get("list", [])
+
+        all_devices: list[dict[str, Any]] = []
+        for home in homes:
+            home_id = home.get("homeId") or home.get("id")
+            if not home_id:
+                continue
+            try:
+                dev_resp = await self._post(
+                    f"/api/home/devices",
+                    {"homeId": home_id},
+                )
+                result = dev_resp.get("result", [])
+                if isinstance(result, dict):
+                    devs = result.get("list", result.get("devices", []))
+                else:
+                    devs = result
+                all_devices.extend(devs)
+            except TuyaApiError:
+                _LOGGER.debug("Failed to get devices for home %s", home_id)
+                continue
+
+        _LOGGER.debug("Fallback found %d devices across %d homes", len(all_devices), len(homes))
+        return all_devices
 
     async def async_get_webrtc_config(self, device_id: str) -> dict[str, Any]:
         """Get WebRTC configuration for a device.

@@ -17,6 +17,18 @@
           "device_id": "Device"
         }
       },
+      "manual": {
+        "title": "Manual Device Entry",
+        "description": "Auto-discovery found no devices. Enter device ID and local key manually.",
+        "data": {
+          "device_id": "Device ID",
+          "local_key": "Local Key"
+        },
+        "data_description": {
+          "device_id": "Camera device ID from Tuya app",
+          "local_key": "Device local key (needed for camera wake-up)"
+        }
+      },
       "reauth_confirm": {
         "title": "Re-authenticate",
         "description": "Update your Tuya credentials for the peephole camera.",
