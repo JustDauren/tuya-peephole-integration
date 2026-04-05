@@ -1,0 +1,54 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Tuya Peephole Camera",
+        "description": "Enter your Tuya Smart / Smart Life app credentials and the camera device ID.",
+        "data": {
+          "email": "Email",
+          "password": "Password",
+          "device_id": "Device ID",
+          "local_key": "Local Key",
+          "region": "Region"
+        },
+        "data_description": {
+          "local_key": "Device local key from Tuya app (used for camera wake-up)"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Re-authenticate",
+        "description": "Update your Tuya credentials for the peephole camera.",
+        "data": {
+          "email": "Email",
+          "password": "Password",
+          "local_key": "Local Key"
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "This device is already configured",
+      "reauth_successful": "Successfully re-authenticated"
+    },
+    "error": {
+      "invalid_auth": "Invalid credentials. Check email, password, and region.",
+      "cannot_connect": "Cannot connect to Tuya API. Check network and try again.",
+      "unknown": "Unexpected error. Check logs for details."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Recording Settings",
+        "data": {
+          "recording_enabled": "Enable recording",
+          "retention_days": "Retention (days)",
+          "recording_duration": "Recording duration (seconds)"
+        },
+        "data_description": {
+          "retention_days": "Recordings older than this will be automatically deleted (1-30 days)",
+          "recording_duration": "Duration of each motion-triggered recording (10-300 seconds)"
+        }
+      }
+    }
+  }
+}

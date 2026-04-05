@@ -1,0 +1,24 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+dist/
+build/
+*.egg
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Secrets — NEVER commit
+secrets.env
+secrets.yaml
+*.secrets
+.env
+
+# Development files — local only
+.planning/
+PROJECT.md
+PROMPT.md
+CLAUDE.md
+auth_example.py
+secrets.env.example

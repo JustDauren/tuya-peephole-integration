@@ -1,0 +1,13 @@
+{
+  "domain": "tuya_peephole",
+  "name": "Tuya Peephole Camera",
+  "version": "0.1.0",
+  "codeowners": ["@JustDauren"],
+  "config_flow": true,
+  "dependencies": [],
+  "documentation": "https://github.com/JustDauren/tuya-peephole-integration",
+  "iot_class": "cloud_push",
+  "issue_tracker": "https://github.com/JustDauren/tuya-peephole-integration/issues",
+  "requirements": ["paho-mqtt==2.1.0", "aiortc==1.14.0"],
+  "loggers": ["paho", "aiortc", "aioice"]
+}
