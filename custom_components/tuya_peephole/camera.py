@@ -278,7 +278,7 @@ class TuyaPeepholeCamera(Camera):
             )
 
             # Register per-topic callback for WebRTC signaling messages
-            mqtt_client._client.message_callback_add(
+            mqtt_client.message_callback_add(
                 subscribe_topic,
                 lambda client, userdata, msg: self._on_signaling_message(
                     msg.payload, signaling_id
@@ -493,8 +493,8 @@ class TuyaPeepholeCamera(Camera):
         mqtt_client = self.coordinator.mqtt_client
         if mqtt_client is not None:
             try:
-                mqtt_client._client.message_callback_remove(subscribe_topic)
-                mqtt_client._client.unsubscribe(subscribe_topic)
+                mqtt_client.message_callback_remove(subscribe_topic)
+                mqtt_client.unsubscribe(subscribe_topic)
             except Exception:
                 _LOGGER.debug(
                     "Error during signaling cleanup", exc_info=True

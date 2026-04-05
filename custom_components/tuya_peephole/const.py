@@ -20,10 +20,10 @@ REGIONS: dict[str, str] = {
 
 # Friendly names for region selector in config flow
 REGION_NAMES: dict[str, str] = {
-    "eu": "Europe (Central)",
+    "eu": "Europe / CIS / Kazakhstan",
     "eu_east": "Europe (East)",
-    "us": "America (West)",
-    "us_east": "America (East)",
+    "us": "Americas (West)",
+    "us_east": "Americas (East)",
     "cn": "China",
     "in": "India",
 }

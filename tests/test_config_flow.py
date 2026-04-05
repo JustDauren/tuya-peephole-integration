@@ -55,13 +55,18 @@ class TestConfigFlowUserStep:
     async def test_user_step_creates_entry_on_success(
         self, mock_config_entry_data: dict
     ) -> None:
-        """[CONF-01] Successful login creates a config entry."""
+        """[CONF-01] Successful login proceeds to device selection, then creates entry."""
         flow_cls = _get_config_flow_class()
         flow = flow_cls()
         flow.hass = MagicMock()
 
         mock_api = MagicMock()
         mock_api.async_login = AsyncMock(return_value={"sid": "test_sid"})
+        mock_api.async_get_device_list = AsyncMock(return_value=[
+            {"id": mock_config_entry_data[CONF_DEVICE_ID], "name": "Peephole", "localKey": mock_config_entry_data.get("local_key", "test_key")},
+        ])
+
+        creds = {CONF_EMAIL: mock_config_entry_data[CONF_EMAIL], CONF_PASSWORD: mock_config_entry_data[CONF_PASSWORD], CONF_REGION: mock_config_entry_data[CONF_REGION]}
 
         with (
             patch(
@@ -73,11 +78,15 @@ class TestConfigFlowUserStep:
                 return_value=mock_api,
             ),
         ):
-            result = await flow.async_step_user(user_input=mock_config_entry_data)
+            # Step 1: credentials → should advance to device step
+            result = await flow.async_step_user(user_input=creds)
 
+        assert result["type"] == "form"
+        assert result["step_id"] == "device"
+
+        # Step 2: select device → should create entry
+        result = await flow.async_step_device(user_input={CONF_DEVICE_ID: mock_config_entry_data[CONF_DEVICE_ID]})
         assert result["type"] == "create_entry"
-        assert result["data"] == mock_config_entry_data
-        assert mock_config_entry_data[CONF_DEVICE_ID] in result["title"]
 
     @pytest.mark.asyncio
     async def test_user_step_invalid_auth_error(
@@ -164,27 +173,29 @@ class TestConfigFlowUserStep:
     async def test_user_step_sets_unique_id(
         self, mock_config_entry_data: dict
     ) -> None:
-        """[CONF-01] Config flow sets unique_id to device_id."""
+        """[CONF-01] Config flow sets unique_id to device_id in device step."""
         flow_cls = _get_config_flow_class()
         flow = flow_cls()
         flow.hass = MagicMock()
 
+        device_id = mock_config_entry_data[CONF_DEVICE_ID]
         mock_api = MagicMock()
         mock_api.async_login = AsyncMock(return_value={"sid": "test_sid"})
+        mock_api.async_get_device_list = AsyncMock(return_value=[
+            {"id": device_id, "name": "Peephole", "localKey": "test_key"},
+        ])
+
+        creds = {CONF_EMAIL: mock_config_entry_data[CONF_EMAIL], CONF_PASSWORD: mock_config_entry_data[CONF_PASSWORD], CONF_REGION: mock_config_entry_data[CONF_REGION]}
 
         with (
-            patch(
-                "custom_components.tuya_peephole.config_flow.async_create_clientsession",
-                return_value=MagicMock(),
-            ),
-            patch(
-                "custom_components.tuya_peephole.config_flow.TuyaSmartAPI",
-                return_value=mock_api,
-            ),
+            patch("custom_components.tuya_peephole.config_flow.async_create_clientsession", return_value=MagicMock()),
+            patch("custom_components.tuya_peephole.config_flow.TuyaSmartAPI", return_value=mock_api),
         ):
-            await flow.async_step_user(user_input=mock_config_entry_data)
+            await flow.async_step_user(user_input=creds)
 
-        assert flow._unique_id == mock_config_entry_data[CONF_DEVICE_ID]
+        # Device step sets unique_id
+        await flow.async_step_device(user_input={CONF_DEVICE_ID: device_id})
+        assert flow._unique_id == device_id
 
     @pytest.mark.asyncio
     async def test_user_step_already_configured(
@@ -195,41 +206,31 @@ class TestConfigFlowUserStep:
         flow = flow_cls()
         flow.hass = MagicMock()
 
-        # Override _abort_if_unique_id_configured to simulate HA's behavior
-        from homeassistant.data_entry_flow import FlowResult
-
-        def raise_abort() -> None:
-            raise _AbortFlow("already_configured")
+        device_id = mock_config_entry_data[CONF_DEVICE_ID]
 
         class _AbortFlow(Exception):
             def __init__(self, reason: str) -> None:
                 self.reason = reason
                 super().__init__(reason)
 
-        # Patch the flow to simulate abort
-        original_abort = flow._abort_if_unique_id_configured
-
-        def mock_abort_if_configured() -> None:
-            # Simulate HA raising abort when unique ID is already configured
-            raise _AbortFlow("already_configured")
-
-        flow._abort_if_unique_id_configured = mock_abort_if_configured
+        flow._abort_if_unique_id_configured = lambda: (_ for _ in ()).throw(_AbortFlow("already_configured"))
 
         mock_api = MagicMock()
         mock_api.async_login = AsyncMock(return_value={"sid": "test_sid"})
+        mock_api.async_get_device_list = AsyncMock(return_value=[
+            {"id": device_id, "name": "Peephole", "localKey": "test_key"},
+        ])
+
+        creds = {CONF_EMAIL: mock_config_entry_data[CONF_EMAIL], CONF_PASSWORD: mock_config_entry_data[CONF_PASSWORD], CONF_REGION: mock_config_entry_data[CONF_REGION]}
 
         with (
-            patch(
-                "custom_components.tuya_peephole.config_flow.async_create_clientsession",
-                return_value=MagicMock(),
-            ),
-            patch(
-                "custom_components.tuya_peephole.config_flow.TuyaSmartAPI",
-                return_value=mock_api,
-            ),
+            patch("custom_components.tuya_peephole.config_flow.async_create_clientsession", return_value=MagicMock()),
+            patch("custom_components.tuya_peephole.config_flow.TuyaSmartAPI", return_value=mock_api),
         ):
-            with pytest.raises(_AbortFlow, match="already_configured"):
-                await flow.async_step_user(user_input=mock_config_entry_data)
+            await flow.async_step_user(user_input=creds)
+
+        with pytest.raises(_AbortFlow, match="already_configured"):
+            await flow.async_step_device(user_input={CONF_DEVICE_ID: device_id})
 
 
 class TestConfigFlowStructure:

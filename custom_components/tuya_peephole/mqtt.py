@@ -209,8 +209,12 @@ class TuyaMQTTClient:
         Raises:
             TuyaApiError: If connection times out or fails.
         """
-        # Configure client identity
-        self._client._client_id = client_id.encode()
+        # Recreate client with correct client_id (avoid mutating private attrs)
+        self._client = mqtt.Client(
+            callback_api_version=mqtt.CallbackAPIVersion.VERSION2,
+            client_id=client_id,
+            protocol=mqtt.MQTTv311,
+        )
         self._client.username_pw_set(username, password)
 
         # Configure TLS (Tuya broker requires CERT_NONE)
@@ -275,6 +279,37 @@ class TuyaMQTTClient:
         """
         self._client.publish(topic, payload, qos)
         _LOGGER.debug("MQTT published to %s (len=%d, qos=%d)", topic, len(payload), qos)
+
+    def unsubscribe(self, topic: str) -> None:
+        """Unsubscribe from an MQTT topic.
+
+        Args:
+            topic: Topic string to unsubscribe from.
+        """
+        self._client.unsubscribe(topic)
+        _LOGGER.debug("MQTT unsubscribed from %s", topic)
+
+    def message_callback_add(
+        self, topic: str, callback: Callable[..., None]
+    ) -> None:
+        """Add a per-topic message callback.
+
+        Messages matching this topic will be routed to the callback
+        instead of the default message handler.
+
+        Args:
+            topic: Topic filter string.
+            callback: Callback function matching paho's on_message signature.
+        """
+        self._client.message_callback_add(topic, callback)
+
+    def message_callback_remove(self, topic: str) -> None:
+        """Remove a per-topic message callback.
+
+        Args:
+            topic: Topic filter to remove callback for.
+        """
+        self._client.message_callback_remove(topic)
 
     async def async_disconnect(self) -> None:
         """Disconnect from the MQTT broker and clean up resources."""

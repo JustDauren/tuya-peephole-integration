@@ -56,24 +56,23 @@ class TestTuyaMQTTClientConnect:
         """[MQTT-01] Connect sets TLS context with check_hostname=False and CERT_NONE."""
         from custom_components.tuya_peephole.mqtt import TuyaMQTTClient
 
+        mock_paho = MagicMock()
         client = TuyaMQTTClient(mock_hass_with_loop)
-
-        # Mock paho client methods
-        client._client = MagicMock()
         client._connected = MagicMock()
         client._connected.wait = AsyncMock()
 
-        await client.async_connect(
-            broker="m1-eu.iot334.com",
-            port=8883,
-            client_id="web_test_msid",
-            username="web_test_msid",
-            password="testpass",
-        )
+        with patch("custom_components.tuya_peephole.mqtt.mqtt.Client", return_value=mock_paho):
+            await client.async_connect(
+                broker="m1-eu.iot334.com",
+                port=8883,
+                client_id="web_test_msid",
+                username="web_test_msid",
+                password="testpass",
+            )
 
         # Verify tls_set_context was called
-        client._client.tls_set_context.assert_called_once()
-        ssl_ctx = client._client.tls_set_context.call_args[0][0]
+        mock_paho.tls_set_context.assert_called_once()
+        ssl_ctx = mock_paho.tls_set_context.call_args[0][0]
         assert isinstance(ssl_ctx, ssl.SSLContext)
         assert ssl_ctx.check_hostname is False
         assert ssl_ctx.verify_mode == ssl.CERT_NONE
@@ -85,20 +84,21 @@ class TestTuyaMQTTClientConnect:
         """[MQTT-01] Connect sets MQTT username and password."""
         from custom_components.tuya_peephole.mqtt import TuyaMQTTClient
 
+        mock_paho = MagicMock()
         client = TuyaMQTTClient(mock_hass_with_loop)
-        client._client = MagicMock()
         client._connected = MagicMock()
         client._connected.wait = AsyncMock()
 
-        await client.async_connect(
-            broker="m1-eu.iot334.com",
-            port=8883,
-            client_id="web_test_msid",
-            username="web_test_msid",
-            password="testpass",
-        )
+        with patch("custom_components.tuya_peephole.mqtt.mqtt.Client", return_value=mock_paho):
+            await client.async_connect(
+                broker="m1-eu.iot334.com",
+                port=8883,
+                client_id="web_test_msid",
+                username="web_test_msid",
+                password="testpass",
+            )
 
-        client._client.username_pw_set.assert_called_once_with(
+        mock_paho.username_pw_set.assert_called_once_with(
             "web_test_msid", "testpass"
         )
 
@@ -137,20 +137,21 @@ class TestTuyaMQTTClientConnect:
         """[MQTT-04] Connect sets reconnect_delay_set(min_delay=1, max_delay=120)."""
         from custom_components.tuya_peephole.mqtt import TuyaMQTTClient
 
+        mock_paho = MagicMock()
         client = TuyaMQTTClient(mock_hass_with_loop)
-        client._client = MagicMock()
         client._connected = MagicMock()
         client._connected.wait = AsyncMock()
 
-        await client.async_connect(
-            broker="m1-eu.iot334.com",
-            port=8883,
-            client_id="web_test_msid",
-            username="web_test_msid",
-            password="testpass",
-        )
+        with patch("custom_components.tuya_peephole.mqtt.mqtt.Client", return_value=mock_paho):
+            await client.async_connect(
+                broker="m1-eu.iot334.com",
+                port=8883,
+                client_id="web_test_msid",
+                username="web_test_msid",
+                password="testpass",
+            )
 
-        client._client.reconnect_delay_set.assert_called_once_with(
+        mock_paho.reconnect_delay_set.assert_called_once_with(
             min_delay=1, max_delay=120
         )
 

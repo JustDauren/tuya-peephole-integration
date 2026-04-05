@@ -313,9 +313,9 @@ class TestCloseSession:
 
         camera.close_webrtc_session("test_session_abc")
 
-        paho_client = coordinator.mqtt_client._client
-        paho_client.message_callback_remove.assert_called_once()
-        paho_client.unsubscribe.assert_called_once()
+        mqtt_client = coordinator.mqtt_client
+        mqtt_client.message_callback_remove.assert_called_once()
+        mqtt_client.unsubscribe.assert_called_once()
 
     def test_close_session_resets_state(self) -> None:
         """After close, session state is cleared."""

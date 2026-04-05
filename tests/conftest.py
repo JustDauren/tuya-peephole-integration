@@ -561,10 +561,14 @@ class _MockBrowseMediaSource:
         self.thumbnail = thumbnail
 
 
+class _MockBrowseError(Exception):
+    """Mock BrowseError."""
+
 _mock_ha_media_source.MediaSource = _MockMediaSource  # type: ignore[attr-defined]
 _mock_ha_media_source.MediaSourceItem = _MockMediaSourceItem  # type: ignore[attr-defined]
 _mock_ha_media_source.PlayMedia = _MockPlayMedia  # type: ignore[attr-defined]
 _mock_ha_media_source.BrowseMediaSource = _MockBrowseMediaSource  # type: ignore[attr-defined]
+_mock_ha_media_source.BrowseError = _MockBrowseError  # type: ignore[attr-defined]
 sys.modules["homeassistant.components.media_source"] = _mock_ha_media_source
 
 # Register all mock modules

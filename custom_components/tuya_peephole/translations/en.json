@@ -3,16 +3,18 @@
     "step": {
       "user": {
         "title": "Tuya Peephole Camera",
-        "description": "Enter your Tuya Smart / Smart Life app credentials and the camera device ID.",
+        "description": "Enter your Tuya Smart / Smart Life app credentials.",
         "data": {
           "email": "Email",
           "password": "Password",
-          "device_id": "Device ID",
-          "local_key": "Local Key",
           "region": "Region"
-        },
-        "data_description": {
-          "local_key": "Device local key from Tuya app (used for camera wake-up)"
+        }
+      },
+      "device": {
+        "title": "Select Camera",
+        "description": "Choose your peephole camera from the list of devices found in your account.",
+        "data": {
+          "device_id": "Device"
         }
       },
       "reauth_confirm": {
@@ -20,18 +22,20 @@
         "description": "Update your Tuya credentials for the peephole camera.",
         "data": {
           "email": "Email",
-          "password": "Password",
-          "local_key": "Local Key"
+          "password": "Password"
         }
       }
     },
     "abort": {
       "already_configured": "This device is already configured",
-      "reauth_successful": "Successfully re-authenticated"
+      "reauth_successful": "Successfully re-authenticated",
+      "no_devices": "No devices found in your Tuya account"
     },
     "error": {
       "invalid_auth": "Invalid credentials. Check email, password, and region.",
       "cannot_connect": "Cannot connect to Tuya API. Check network and try again.",
+      "no_devices": "No devices found in your Tuya account.",
+      "device_not_found": "Selected device not found. Try again.",
       "unknown": "Unexpected error. Check logs for details."
     }
   },

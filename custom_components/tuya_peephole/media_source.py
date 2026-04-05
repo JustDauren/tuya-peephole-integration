@@ -11,6 +11,7 @@ from pathlib import Path
 
 from homeassistant.components.media_player import MediaClass, MediaType
 from homeassistant.components.media_source import (
+    BrowseError,
     BrowseMediaSource,
     MediaSource,
     MediaSourceItem,
@@ -55,7 +56,7 @@ class TuyaPeepholeMediaSource(MediaSource):
             )
         )
         if not await self.hass.async_add_executor_job(full_path.is_file):
-            raise BrowseError(  # noqa: F821 -- HA raises this from media_source
+            raise BrowseError(
                 f"Recording not found: {item.identifier}"
             )
 

@@ -192,7 +192,7 @@ class RecordingSession:
 
             # Register per-topic callback for signaling messages
             session_id = self._session_id
-            mqtt_client._client.message_callback_add(
+            mqtt_client.message_callback_add(
                 self._subscribe_topic,
                 lambda client, userdata, msg: self._on_signaling_message(
                     msg.payload
@@ -351,10 +351,10 @@ class RecordingSession:
             and self._subscribe_topic is not None
         ):
             try:
-                mqtt_client._client.message_callback_remove(
+                mqtt_client.message_callback_remove(
                     self._subscribe_topic
                 )
-                mqtt_client._client.unsubscribe(self._subscribe_topic)
+                mqtt_client.unsubscribe(self._subscribe_topic)
             except Exception:
                 _LOGGER.debug(
                     "Error during recording MQTT cleanup", exc_info=True

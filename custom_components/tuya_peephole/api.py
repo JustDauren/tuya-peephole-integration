@@ -172,6 +172,19 @@ class TuyaSmartAPI:
             )
             return result
 
+    async def async_get_device_list(self) -> list[dict[str, Any]]:
+        """Get list of user's devices from Tuya Smart App API.
+
+        Returns list of devices with id, name, localKey, category, etc.
+        Used during config flow to let user pick their camera device.
+        """
+        resp = await self._post(
+            "/api/discovery/pns/device/list",
+            {"type": "all"},
+        )
+        devices: list[dict[str, Any]] = resp.get("result", [])
+        return devices
+
     async def async_get_webrtc_config(self, device_id: str) -> dict[str, Any]:
         """Get WebRTC configuration for a device.
 
