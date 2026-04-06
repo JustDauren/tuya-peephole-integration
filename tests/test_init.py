@@ -42,6 +42,7 @@ def _get_unload_entry():
 def _make_mock_coordinator():
     """Create a mock coordinator for patching."""
     mock_coord = MagicMock()
+    mock_coord.async_connect_mqtt = AsyncMock()
     mock_coord.async_config_entry_first_refresh = AsyncMock()
     mock_coord.async_teardown = AsyncMock()
     mock_coord.is_charging = False

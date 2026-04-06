@@ -88,14 +88,23 @@ class TuyaPeepholeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._charging_detected = False
         self._battery_100_since: float | None = None  # monotonic time when battery first hit 100
 
-    async def _async_setup(self) -> None:
-        """Set up the MQTT client connection.
+    async def async_connect_mqtt(self) -> None:
+        """Connect to Tuya MQTT broker.
 
-        Called by async_config_entry_first_refresh. Fetches MQTT credentials
-        from the Tuya API and connects to the MQTT broker.
+        Fetches MQTT credentials from Tuya API, creates client,
+        connects over TLS, and subscribes to device topics.
+        Called explicitly from __init__.py async_setup_entry.
         """
+        _LOGGER.debug("Fetching MQTT config for device %s", self.device_id)
         mqtt_config = await self.api.async_get_mqtt_config(self.device_id)
         msid = mqtt_config["msid"]
+        mqtt_password = mqtt_config["password"]
+        broker = self.api.mqtt_url
+
+        _LOGGER.debug(
+            "MQTT config: broker=%s, msid=%s..., client_id=web_%s...",
+            broker, msid[:10], msid[:10],
+        )
 
         self.mqtt_client = TuyaMQTTClient(self.hass)
         self.mqtt_client.set_message_callback(self._handle_mqtt_message)
@@ -105,20 +114,25 @@ class TuyaPeepholeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         )
 
         await self.mqtt_client.async_connect(
-            broker=self.api.mqtt_url,
+            broker=broker,
             port=MQTT_PORT,
             client_id=f"web_{msid}",
             username=f"web_{msid}",
-            password=mqtt_config["password"],
+            password=mqtt_password,
         )
 
         # Store msid for WebRTC signaling topic construction
         self._msid = msid
+        _LOGGER.info("MQTT connected to %s, subscribing to topics", broker)
 
         # Subscribe to device messages
         self.mqtt_client.subscribe(
             f"smart/decrypt/in/{self.device_id}", qos=0
         )
+
+    async def _async_setup(self) -> None:
+        """Called by DataUpdateCoordinator — MQTT is already connected."""
+        pass
 
     def _build_state_dict(self) -> dict[str, Any]:
         """Build the state dict pushed to all listening entities.

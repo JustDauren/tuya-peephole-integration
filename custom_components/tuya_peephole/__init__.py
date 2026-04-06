@@ -69,6 +69,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     coordinator = TuyaPeepholeCoordinator(
         hass, api, entry.data[CONF_DEVICE_ID], entry.data[CONF_LOCAL_KEY]
     )
+
+    # Connect MQTT explicitly (don't rely on _async_setup being called by DUC)
+    try:
+        await coordinator.async_connect_mqtt()
+        _LOGGER.info("MQTT connected for device %s", entry.data[CONF_DEVICE_ID])
+    except Exception as err:
+        _LOGGER.error("MQTT connection failed: %s", err)
+        raise ConfigEntryNotReady(f"MQTT connection failed: {err}") from err
+
     await coordinator.async_config_entry_first_refresh()
 
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
