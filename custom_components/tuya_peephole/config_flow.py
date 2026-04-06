@@ -75,29 +75,34 @@ class TuyaPeepholeConfigFlow(ConfigFlow, domain=DOMAIN):
                     country_code=region.upper(),
                 )
                 _LOGGER.debug("Attempting Tuya login for %s (region=%s)", user_input[CONF_EMAIL], region)
-                login_result = await self._api.async_login()
-                _LOGGER.debug("Login successful, uid=%s. Fetching device list...", self._api.uid)
+                await self._api.async_login()
+                _LOGGER.debug("Login successful, uid=%s", self._api.uid)
+
+                # Try to auto-discover devices (optional — falls back to manual)
                 try:
                     self._devices = await self._api.async_get_device_list()
                 except TuyaApiError:
-                    _LOGGER.warning("Device list API failed, trying fallback endpoint")
-                    self._devices = await self._api.async_get_device_list_fallback()
+                    _LOGGER.warning("Device list API failed, trying fallback")
+                    try:
+                        self._devices = await self._api.async_get_device_list_fallback()
+                    except TuyaApiError:
+                        _LOGGER.warning("Fallback also failed, using manual entry")
+                        self._devices = []
             except TuyaAuthError as err:
                 _LOGGER.warning("Auth failed: %s", err)
                 errors["base"] = "invalid_auth"
             except TuyaApiError as err:
-                _LOGGER.error("API error during setup: %s", err)
+                _LOGGER.error("API error during login: %s", err)
                 errors["base"] = "cannot_connect"
             except Exception:
                 _LOGGER.exception("Unexpected error during setup")
                 errors["base"] = "unknown"
             else:
-                _LOGGER.debug("Found %d devices", len(self._devices))
                 if self._devices:
+                    _LOGGER.debug("Found %d devices", len(self._devices))
                     return await self.async_step_device()
                 else:
-                    # No devices found via API — fall through to manual entry
-                    _LOGGER.warning("No devices found via API, offering manual entry")
+                    _LOGGER.info("No devices discovered, using manual entry")
                     return await self.async_step_manual()
 
         return self.async_show_form(
