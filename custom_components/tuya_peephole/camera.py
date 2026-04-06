@@ -236,15 +236,12 @@ class TuyaPeepholeCamera(Camera):
     async def _async_webrtc_signaling(self, offer_sdp: str) -> None:
         """Run WebRTC signaling flow (background task)."""
         try:
-            # Step 1: Wake camera if sleeping
-            if self.coordinator.camera_state != CameraState.AWAKE:
-                _LOGGER.debug(
-                    "Camera not awake, sending wake command before WebRTC offer"
-                )
-                # Wait for wake (not fire-and-forget — camera needs to be awake for WebRTC)
-                awake = await self.coordinator.async_wake_camera()
-                if not awake:
-                    _LOGGER.warning("Camera did not wake, trying WebRTC anyway")
+            # Step 1: ALWAYS send wake before WebRTC (not just when sleeping)
+            # CRC32 wake also signals camera to prepare for WebRTC session
+            _LOGGER.debug("Sending wake command before WebRTC offer")
+            awake = await self.coordinator.async_wake_camera(force=True)
+            if not awake:
+                _LOGGER.warning("Camera did not confirm wake, trying WebRTC anyway")
 
             # Step 2: Fetch FRESH config (invalidate cache — auth tokens expire)
             self._webrtc_config = None

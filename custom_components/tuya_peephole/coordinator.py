@@ -236,22 +236,27 @@ class TuyaPeepholeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._motion_clear_unsub = None
         self.async_set_updated_data(self._build_state_dict())
 
-    async def async_wake_camera(self) -> bool:
+    async def async_wake_camera(self, force: bool = False) -> bool:
         """Send CRC32 wake packet to the camera via MQTT.
 
         Computes CRC32 of the local_key, packs as big-endian 4 bytes,
         and publishes to m/w/{device_id} with QoS 1. Waits up to
         WAKE_TIMEOUT seconds for wireless_awake confirmation.
 
+        Args:
+            force: If True, skip cooldown and AWAKE state checks.
+                   Used by WebRTC to always send wake before offer.
+
         Returns:
             True if camera confirmed awake, False on timeout.
         """
-        if self._wake_cooldown:
-            _LOGGER.debug("Wake cooldown active, skipping wake request")
-            return self._camera_state == CameraState.AWAKE
+        if not force:
+            if self._wake_cooldown:
+                _LOGGER.debug("Wake cooldown active, skipping wake request")
+                return self._camera_state == CameraState.AWAKE
 
-        if self._camera_state == CameraState.AWAKE:
-            return True
+            if self._camera_state == CameraState.AWAKE:
+                return True
 
         if self.mqtt_client is None or not self.mqtt_client.is_connected:
             _LOGGER.warning("Cannot wake camera: MQTT not connected")
