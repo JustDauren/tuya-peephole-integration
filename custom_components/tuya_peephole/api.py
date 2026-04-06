@@ -114,63 +114,87 @@ class TuyaSmartAPI:
 
         return result
 
-    async def async_login(self) -> dict[str, Any]:
+    async def async_login(self, max_retries: int = 3) -> dict[str, Any]:
         """Perform full Tuya login: token -> RSA encrypt password -> login.
 
         Step 1: POST /api/login/token to get token + RSA public key (pbKey).
         Step 2: MD5(password) -> RSA PKCS1v15 encrypt -> hex.
         Step 3: POST /api/private/email/login to get sid, uid, mobileMqttsUrl.
 
+        Retries on SYSTEM_ERROR (Tuya API is intermittent for some regions).
+
         Returns:
             Login result dict containing sid, uid, domain info.
 
         Raises:
             TuyaAuthError: On wrong credentials.
-            TuyaApiError: On network or API errors.
+            TuyaApiError: On network or API errors after all retries.
         """
         async with self._login_lock:
-            # Step 1: Get token + RSA public key
-            token_resp = await self._post(
-                "/api/login/token",
-                {
-                    "countryCode": self._country_code,
-                    "username": self._email,
-                    "isUid": False,
-                },
-            )
-            td = token_resp["result"]
-            token = td["token"]
-            pb_key = td.get("pbKey", td.get("publicKey"))
+            last_error: Exception | None = None
 
-            # Step 2: RSA encrypt MD5(password) using cryptography library
-            der_bytes = base64.b64decode(pb_key)
-            public_key = load_der_public_key(der_bytes)
-            passwd_md5 = hashlib.md5(self._password.encode()).hexdigest()
-            encrypted = public_key.encrypt(passwd_md5.encode(), padding.PKCS1v15())
-            encrypted_hex = encrypted.hex()
+            for attempt in range(1, max_retries + 1):
+                try:
+                    # Step 1: Get token + RSA public key (fresh each attempt)
+                    token_resp = await self._post(
+                        "/api/login/token",
+                        {
+                            "countryCode": self._country_code,
+                            "username": self._email,
+                            "isUid": False,
+                        },
+                    )
+                    td = token_resp["result"]
+                    token = td["token"]
+                    pb_key = td.get("pbKey", td.get("publicKey"))
 
-            # Step 3: Login with encrypted password
-            login_resp = await self._post(
-                "/api/private/email/login",
-                {
-                    "countryCode": self._country_code,
-                    "email": self._email,
-                    "passwd": encrypted_hex,
-                    "token": token,
-                    "ifencrypt": 1,
-                    "options": '{"group":1}',
-                },
-            )
+                    # Step 2: RSA encrypt MD5(password)
+                    der_bytes = base64.b64decode(pb_key)
+                    public_key = load_der_public_key(der_bytes)
+                    passwd_md5 = hashlib.md5(self._password.encode()).hexdigest()
+                    encrypted = public_key.encrypt(
+                        passwd_md5.encode(), padding.PKCS1v15()
+                    )
+                    encrypted_hex = encrypted.hex()
 
-            result = login_resp["result"]
-            self.sid = result["sid"]
-            self.uid = result["uid"]
-            self.mqtt_url = result["domain"]["mobileMqttsUrl"]
+                    # Step 3: Login
+                    login_resp = await self._post(
+                        "/api/private/email/login",
+                        {
+                            "countryCode": self._country_code,
+                            "email": self._email,
+                            "passwd": encrypted_hex,
+                            "token": token,
+                            "ifencrypt": 1,
+                            "options": '{"group":1}',
+                        },
+                    )
 
-            _LOGGER.debug(
-                "Tuya login successful for %s (uid=%s)", self._email, self.uid
-            )
-            return result
+                    result = login_resp["result"]
+                    self.sid = result["sid"]
+                    self.uid = result["uid"]
+                    self.mqtt_url = result["domain"]["mobileMqttsUrl"]
+
+                    _LOGGER.debug(
+                        "Tuya login successful for %s (uid=%s, attempt=%d)",
+                        self._email, self.uid, attempt,
+                    )
+                    return result
+
+                except TuyaAuthError:
+                    raise  # Wrong password — don't retry
+                except TuyaApiError as err:
+                    last_error = err
+                    if "SYSTEM_ERROR" in str(err) and attempt < max_retries:
+                        _LOGGER.warning(
+                            "Tuya SYSTEM_ERROR on attempt %d/%d, retrying in %ds...",
+                            attempt, max_retries, attempt * 2,
+                        )
+                        await asyncio.sleep(attempt * 2)
+                        continue
+                    raise
+
+            raise last_error or TuyaApiError("Login failed after retries")
 
     async def async_get_device_list(self) -> list[dict[str, Any]]:
         """Get list of user's devices from Tuya Smart App API.
