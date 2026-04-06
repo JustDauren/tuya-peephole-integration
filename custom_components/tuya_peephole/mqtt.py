@@ -150,8 +150,11 @@ class TuyaMQTTClient:
         it to the registered message callback.
         """
         parsed = TuyaMQTTMessage.parse(msg.topic, msg.payload)
+        # Log raw payload for debugging (first 200 chars)
+        raw_preview = msg.payload[:200].decode("utf-8", errors="replace")
         _LOGGER.debug(
-            "MQTT message received: %s (len=%d)", msg.topic, len(msg.payload)
+            "MQTT message on %s (len=%d): %s",
+            msg.topic, len(msg.payload), raw_preview,
         )
         if self._message_callback is not None:
             self._message_callback(parsed)
@@ -218,7 +221,9 @@ class TuyaMQTTClient:
         self._client.username_pw_set(username, password)
 
         # Configure TLS (Tuya broker requires CERT_NONE)
-        ssl_ctx = ssl.create_default_context()
+        # Use SSLContext directly — avoid ssl.create_default_context() which
+        # does blocking disk I/O (loads system certs) and triggers HA detector
+        ssl_ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
         ssl_ctx.check_hostname = False
         ssl_ctx.verify_mode = ssl.CERT_NONE
         self._client.tls_set_context(ssl_ctx)

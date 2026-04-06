@@ -160,20 +160,27 @@ class TuyaPeepholeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     def _handle_mqtt_message(self, message: TuyaMQTTMessage) -> None:
         """Process an incoming MQTT message.
 
-        Updates camera state and motion detection based on message content,
-        then pushes updated data to all listening entities.
-
-        Args:
-            message: Parsed MQTT message from TuyaMQTTClient.
+        NOTE: This may be called from the event loop (AsyncioHelper)
+        or from a paho thread. Use call_soon_threadsafe for safety.
         """
+        _LOGGER.debug(
+            "Processing MQTT: topic=%s awake=%s motion=%s battery=%s signal=%s raw=%s",
+            message.topic,
+            message.is_wireless_awake,
+            message.is_motion,
+            message.battery_percentage,
+            message.signal_strength,
+            message.raw[:100].decode("utf-8", errors="replace") if message.raw else "",
+        )
+
         if message.is_wireless_awake:
             self._camera_state = CameraState.AWAKE
             self._awake_event.set()
+            _LOGGER.info("Camera wake confirmed via MQTT")
 
         if message.is_motion:
             self._motion_detected = True
             self._schedule_motion_clear()
-            # Notify motion subscribers (recording manager)
             for cb in self._on_motion_callbacks:
                 cb()
 
@@ -182,20 +189,16 @@ class TuyaPeepholeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if message.signal_strength is not None:
             self._signal_strength = message.signal_strength
 
-        # Charging detection heuristic: battery=100 sustained for CHARGING_STABLE_MINUTES
         self._update_charging_state()
 
-        _LOGGER.debug(
-            "MQTT message on %s: awake=%s motion=%s battery=%s signal=%s",
-            message.topic,
-            message.is_wireless_awake,
-            message.is_motion,
-            message.battery_percentage,
-            message.signal_strength,
-        )
-
         # Push state update to all entities
-        self.async_set_updated_data(self._build_state_dict())
+        try:
+            self.async_set_updated_data(self._build_state_dict())
+        except RuntimeError:
+            # If called from wrong thread, schedule on event loop
+            self.hass.loop.call_soon_threadsafe(
+                self.async_set_updated_data, self._build_state_dict()
+            )
 
     def _schedule_motion_clear(self) -> None:
         """Schedule automatic motion detection clear after timeout.
