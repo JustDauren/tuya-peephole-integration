@@ -66,29 +66,52 @@ class TuyaMQTTMessage:
 
     @property
     def is_wireless_awake(self) -> bool:
-        """Check if this message indicates the camera woke up.
+        """Check if this message indicates the camera is awake.
 
-        The camera sends a message containing 'wireless_awake'
-        after receiving the CRC32 wake packet.
+        Some cameras send 'wireless_awake' explicitly.
+        Others just send DPS updates (protocol 4) or events (protocol 56)
+        when they're active — any such message means the camera is awake.
         """
-        return "wireless_awake" in self._text
+        # Explicit wake confirmation
+        if "wireless_awake" in self._text:
+            return True
+        # DPS update = camera is active and responding
+        if self._json is not None:
+            proto = self._json.get("protocol")
+            if proto in (4, 56):
+                return True
+        return False
 
     @property
     def is_motion(self) -> bool:
         """Check if this message indicates a motion/PIR event.
 
-        Checks for PIR/motion indicators in both JSON data dict
-        keys and raw text (conservative substring match).
+        Detects motion via:
+        - Protocol 56 with warnLevel (Tuya alarm/motion event)
+        - DPS key 212 with door_lock_video (doorbell/peephole event)
+        - PIR/alarm keywords in data dict or raw text
         """
-        # Check JSON data dict for motion-related keys
         if self._json is not None:
+            # Protocol 56 = alarm/motion event from Tuya
+            if self._json.get("protocol") == 56:
+                data = self._json.get("data", {})
+                if isinstance(data, dict) and data.get("warnLevel"):
+                    return True
+
+            # DPS 212 with door_lock_video = doorbell press / motion capture
             data = self._json.get("data", {})
             if isinstance(data, dict):
+                dps = data.get("dps", {})
+                if isinstance(dps, dict):
+                    dps_212 = dps.get("212", "")
+                    if isinstance(dps_212, str) and "door_lock_video" in dps_212:
+                        return True
+                # Check data dict for motion-related keys
                 for key in data:
                     if key in ("pir", "alarm_message", "movement_detect_pic"):
                         return True
 
-        # Fallback: conservative substring match in raw text
+        # Fallback: substring match in raw text
         text_lower = self._text.lower()
         return any(
             keyword in text_lower

@@ -236,17 +236,25 @@ class TuyaPeepholeCamera(Camera):
     async def _async_webrtc_signaling(self, offer_sdp: str) -> None:
         """Run WebRTC signaling flow (background task)."""
         try:
-            # Step 1: Wake camera if sleeping (fire-and-forget per Pitfall 1)
+            # Step 1: Wake camera if sleeping
             if self.coordinator.camera_state != CameraState.AWAKE:
                 _LOGGER.debug(
                     "Camera not awake, sending wake command before WebRTC offer"
                 )
-                self.hass.async_create_task(
-                    self.coordinator.async_wake_camera()
-                )
+                # Wait for wake (not fire-and-forget — camera needs to be awake for WebRTC)
+                awake = await self.coordinator.async_wake_camera()
+                if not awake:
+                    _LOGGER.warning("Camera did not wake, trying WebRTC anyway")
 
-            # Step 2: Fetch config
+            # Step 2: Fetch FRESH config (invalidate cache — auth tokens expire)
+            self._webrtc_config = None
+            self._mqtt_config = None
+            self.coordinator.api.invalidate_cache()
             await self._async_ensure_config()
+            _LOGGER.debug(
+                "WebRTC config: motoId=%s, auth=%s...",
+                self._moto_id, (self._auth or "")[:20],
+            )
 
             if not self._uid or not self._moto_id or not self._auth:
                 self._send_error(
